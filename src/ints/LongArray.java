@@ -17,6 +17,7 @@
  */
 package ints;
 
+import blbutil.BitList;
 import java.util.Arrays;
 
 /**
@@ -28,6 +29,10 @@ import java.util.Arrays;
 public class LongArray {
 
     private final long[] values;
+
+    public LongArray(BitList bitList) {
+        this.values = bitList.toLongArray();
+    }
 
     /**
      * Constructs a {@code LongArray} instance from the specified values.
@@ -64,11 +69,7 @@ public class LongArray {
      * @throws NullPointerException if {@code ia == null}
      */
     public static long[] toArray(LongArray la) {
-        long[] copy = new long[la.size()];
-        for (int j=0; j<copy.length; ++j) {
-            copy[j] = la.get(j);
-        }
-        return copy;
+        return la.values.clone();
     }
 
     /**

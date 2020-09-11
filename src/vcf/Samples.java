@@ -30,7 +30,7 @@ import java.util.Arrays;
 public final class Samples {
 
     private static final SampleIds sampleIds = SampleIds.instance();
-    private final int[] indexToIdIndex;
+    private final int[] idIndices;
     private final boolean[] isDiploid;
 
     /**
@@ -55,7 +55,7 @@ public final class Samples {
             throw new IllegalArgumentException(String.valueOf(isDiploid));
         }
         checkForDuplicates(idIndices);
-        this.indexToIdIndex = idIndices.clone();
+        this.idIndices = idIndices.clone();
         this.isDiploid = isDiploid.clone();
     }
 
@@ -72,6 +72,30 @@ public final class Samples {
     }
 
     /**
+     * Returns a new samples instance by combining the two list of samples
+     * in the specified order
+     * @param first the first list of samples
+     * @param second the second list of samples
+     * @return the combined samples
+     * @throws IllegalArgumentException if the two lists of samples are not
+     * disjoint
+     * @throws NullPointerException if
+     * {@code first == null || second == null}
+     */
+    public static Samples combine(Samples first, Samples second) {
+        int n1 = first.nSamples();
+        int n2 = second.nSamples();
+        int n = n1+n2;
+        int[] idIndices = new int[n];
+        boolean[] isDiploid = new boolean[n];
+        System.arraycopy(first.idIndices, 0, idIndices, 0, n1);
+        System.arraycopy(second.idIndices, 0, idIndices, n1, n2);
+        System.arraycopy(first.isDiploid, 0, isDiploid, 0, n1);
+        System.arraycopy(second.isDiploid, 0, isDiploid, n1, n2);
+        return new Samples(idIndices, isDiploid);
+    }
+
+    /**
      * Returns an array mapping sample identifier indices to sample indices.
      * Indices for sample identifiers not present in this list of samples
      * are mapped to {@code -1}.
@@ -80,8 +104,8 @@ public final class Samples {
     public int[] idIndexToIndex() {
         int[] idIndexToIndex = new int[sampleIds.size()];
         Arrays.fill(idIndexToIndex, -1);
-        for (int j=0; j<indexToIdIndex.length; ++j) {
-            int idIndex = indexToIdIndex[j];
+        for (int j=0; j<idIndices.length; ++j) {
+            int idIndex = idIndices[j];
             assert idIndexToIndex[idIndex] == -1; // no duplicate sample IDs
             idIndexToIndex[idIndex] = j;
         }
@@ -109,21 +133,15 @@ public final class Samples {
     }
 
     /**
-     * <p>Returns a hash code value for the object.
-     * </p>
-     * <p>The hash code is defined by the following calculation:
-     * </p>
-     * <pre>
-        int hash = 1;
-        for (int j, n=this.nSamples(); j&lt;n; ++j) {
-            hash = 31 * hash + this.idIndex(j);
-        }
-     * </pre>
+     * Returns a hash code value for the object.
      * @return a hash code value for the object.
      */
     @Override
     public int hashCode() {
-        return Arrays.hashCode(this.indexToIdIndex);
+        int hash = 59;
+        hash += 31*Arrays.hashCode(this.isDiploid);
+        hash += 31*Arrays.hashCode(this.idIndices);
+        return hash;
     }
 
     /**
@@ -145,7 +163,10 @@ public final class Samples {
             return false;
         }
         final Samples other = (Samples) obj;
-        return Arrays.equals(this.indexToIdIndex, other.indexToIdIndex);
+        if (Arrays.equals(this.isDiploid, other.isDiploid)) {
+            return false;
+        }
+        return Arrays.equals(this.idIndices, other.idIndices);
     }
 
     /**
@@ -158,7 +179,7 @@ public final class Samples {
      * {@code index < 0 || index >= this.nSamples()}
      */
     public int idIndex(int index) {
-        return indexToIdIndex[index];
+        return idIndices[index];
     }
 
     /**
@@ -166,7 +187,7 @@ public final class Samples {
      * @return the number of samples in this list
      */
     public int nSamples() {
-        return indexToIdIndex.length;
+        return idIndices.length;
     }
 
     /**
@@ -179,7 +200,7 @@ public final class Samples {
      * {@code index < 0 || index >= this.nSamples()}
      */
     public String id(int index) {
-        return sampleIds.id(indexToIdIndex[index]);
+        return sampleIds.id(idIndices[index]);
     }
 
     /**
@@ -190,7 +211,7 @@ public final class Samples {
      * @return this list of samples as an array of sample identifiers
      */
     public String[] ids() {
-        return sampleIds.ids(indexToIdIndex);
+        return sampleIds.ids(idIndices);
     }
 
      /**

@@ -287,7 +287,7 @@ public class RefIt implements SampleFileIt<RefGTRec> {
 
     private boolean applySeqCoding(RefGTRec rec) {
         assert rec.isAlleleCoded();
-        if (rec.marker().nAlleles() >= maxSeqCodedAlleles) {
+        if (rec.marker().nAlleles() > maxSeqCodedAlleles) {
             return false;
         }
         int nHaps = rec.size();

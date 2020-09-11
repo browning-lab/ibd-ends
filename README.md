@@ -2,11 +2,8 @@
 
 The **ibd-ends** program estimates a probability distribution for each endpoint
 of an identity-by-descent (IBD) segment. The input IBD segments for
-the **ibd-ends** program are the output IBD segments from the
-[**hap-ibd**](https://github.com/browning-lab/hap-ibd) program, or a file of
-IBD segments in
-[**hap-ibd** output](https://github.com/browning-lab/hap-ibd#output-files)
-format.
+the **ibd-ends** program are output IBD segments from the
+[**hap-ibd**](https://github.com/browning-lab/hap-ibd) program.
 
 If you use **ibd-ends** in a published analysis, please report the program
 version printed in the first line of the output log file, and
@@ -18,7 +15,7 @@ Probabilistic estimation of identity by descent segment endpoints and
 detection of recent selection. bioRxiv 2020.07.15.205179;
 doi: [https://doi.org/10.1101/2020.07.15.205179](https://doi.org/10.1101/2020.07.15.205179)
 
-Last updated July 16, 2020
+Last updated September 11, 2020
 
 ## Contents
 
@@ -85,17 +82,17 @@ is unphased, you can phase your data using the
 [Beagle](https://faculty.washington.edu/browning/beagle/beagle.html) program.
 A VCF record may have multiple ALT alleles. Only one chromosome is processed
 per analysis.  If the VCF file contains more than one chromosome,
-the **chrom** parameter determines the chromosome that will
-be analyzed. Any input VCF records that are not contained within the
-boundaries of the genetic map will be excluded from the analysis.
+the **chrom** parameter determines the chromosome that is analyzed. The
+analysis relies on an accurate genetic map.  Any input VCF records that are
+outside the genetic map are excluded from the analysis.
 
-* **ibd=[file]** where **[file]** is a
-[hap-ibd](https://github.com/browning-lab/hap-ibd) output file containing IBD
-segments whose endpoints will be estimated. An IBD segment will be ignored
+* **ibd=[file]** where **[file]** is the IBD output file from a
+[hap-ibd](https://github.com/browning-lab/hap-ibd) analysis of the VCF file
+specified with the **gt** parameter. An IBD segment will be ignored
 if it involves a sample that is not present in the input VCF file or if the
 segment lies completely outside the boundaries of the genetic map. If an
-input IBD segment endpoint extends beyond the terminal genetic map position,
-the input endpoint will set equal to the terminal map position.
+input IBD segment endpoint extends beyond a terminal genetic map position,
+the input segment endpoint will set equal to the terminal map position.
 
 * **map=[file]** where **[file]** is a
 [PLINK format genetic map](http://zzz.bwh.harvard.edu/plink/data.shtml#map)
@@ -128,18 +125,16 @@ and "**chrom=[chrom]:[start]‑**" respectively. If a **chrom** parameter is not
 specified, the **chrom** parameter will be set to the CHROM field in the
 first VCF record.
 
-* **quantiles=[comma-separated numbers; 0.0 < number < 1.0]**
-specifies the quantiles of the probability distribution for the distance from
-the focus position to a segment endpoint that will be printed to the
-[IBD output file](#output-files) (**default: quantiles=0.5**).
-For example, **quantiles=0.05,0.5,0.95** will print the 0.05, 0.50, and 0.95
-quantiles of each IBD segment endpoint.
+* **quantiles=[comma-separated numbers: 0.0 < number < 1.0]**
+specifies the quantiles of the probability distribution of the IBD segment
+endpoint that will be printed to the [IBD output file](#output-files)
+(**default: quantiles=0.5**). For example, **quantiles=0.05,0.5,0.95** will
+print the 0.05, 0.50, and 0.95 quantiles of each IBD segment endpoint.
 
 * **nsamples=[integer ≥ 0]** specifies the number of random samples taken from
-the probability distribution for the distance from the focus position
-to a segment endpoint (**default: nsamples=0**). If **nsamples>0**, the
-sampled start and end positions are printed to the
-[IBD output file](#output-files).
+the probability distribution for each IBD segment endpoint
+(**default: nsamples=0**). If **nsamples>0**, the sampled start and end
+positions are printed to the [IBD output file](#output-files).
 
 * **nthreads=[integer ≥ 1]** specifies the number of computational threads to
 use. The default **nthreads** parameter is the number of CPU cores.

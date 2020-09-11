@@ -24,7 +24,11 @@ import vcf.GT;
 
 /**
  * <p>Class {@code QuantileEstimator} estimates the quantiles of an IBD segment
- * end point distribution.</p>
+ * end point distribution. Any IBS segment extending to an end of the
+ * chromosome is assumed to be terminated by discordant alleles at
+ * aa hypothetical marker with the same position as the last marker
+ * and with a genetic position equal that is a specified genetic distance
+ * beyond the last marker.</p>
  *
  * <p>Instances of class {@code QuantileEstimator} are not thread-safe.</p>
  *
@@ -34,7 +38,8 @@ public class QuantileEstimator {
 
     private static final double MIN_RATIO = 0.001;
 
-    private final IbdEndsData data;
+    private final IbdEndsData ibdEndsData;
+    private final int nMarkers;
     private final Data fwdData;
     private final Data revData;
     private final double ne;
@@ -49,27 +54,28 @@ public class QuantileEstimator {
 
     /**
      * Constructs a new {@code QuantileEstimator} instance for the specified data.
-     * @param data the analysis input data
+     * @param ibdEndsData the analysis input data
      * @throws NullPointerException if {@code data == null}
      */
-    public QuantileEstimator(IbdEndsData data) {
-        IbdEndsPar par = data.par();
-        this.data = data;
-        this.fwdData = new Data(data, true);
-        this.revData = new Data(data, false);
+    public QuantileEstimator(IbdEndsData ibdEndsData) {
+        IbdEndsPar par = ibdEndsData.par();
+        this.ibdEndsData = ibdEndsData;
+        this.nMarkers = ibdEndsData.fwdGT().nMarkers();
+        this.fwdData = new Data(ibdEndsData, true);
+        this.revData = new Data(ibdEndsData, false);
         this.ne = par.ne();
         this.err = par.err();
         this.gc_bp = par.gc_bp();
         this.gc_err = par.gc_err();
-        this.cdf = new double[data.fwdGT().nMarkers()];
+        this.cdf = new double[ibdEndsData.fwdGT().nMarkers()+1]; // includes hypothetical marker
     }
 
     /**
      * Returns the input data.
      * @return the input data
      */
-    public IbdEndsData data() {
-        return data;
+    public IbdEndsData ibdEndsData() {
+        return ibdEndsData;
     }
 
     /**
@@ -85,9 +91,9 @@ public class QuantileEstimator {
      * @param quantiles an array which will contain the end-point quantiles
      * corresponding to the specified probabilities
      * @throws IndexOutOfBoundsException if
-     * {@code hap1 < 0 || hap1 >= this.data().fwdGT().nHaps()}
+     * {@code hap1 < 0 || hap1 >= this.ibdEndsData().fwdGT().nHaps()}
      * @throws IndexOutOfBoundsException if
-     * {@code hap2 < 0 || hap2 >= this.data().fwdGT().nHaps()}
+     * {@code hap2 < 0 || hap2 >= this.ibdEndsData().fwdGT().nHaps()}
      * @throws IllegalArgumentException if
      * {@code Double.isNaN(ibdStartMorgans) == true}
      * @throws IllegalArgumentException if the focus position is less than or
@@ -131,9 +137,9 @@ public class QuantileEstimator {
      * specified {@code probs} array satisfies
      * {@code (p <= 0.0 || p >= 1.0 || Double.isNaN(p))}
      * @throws IndexOutOfBoundsException if
-     * {@code hap1 < 0 || hap1 >= this.data().fwdGT().nHaps()}
+     * {@code hap1 < 0 || hap1 >= this.ibdEndsData().fwdGT().nHaps()}
      * @throws IndexOutOfBoundsException if
-     * {@code hap2 < 0 || hap2 >= this.data().fwdGT().nHaps()}
+     * {@code hap2 < 0 || hap2 >= this.ibdEndsData().fwdGT().nHaps()}
      * @throws IndexOutOfBoundsException if {@code probs.length > quantiles.length}
      * @throws NullPointerException if {@code probs == null || quantiles == null}
      */
@@ -168,13 +174,13 @@ public class QuantileEstimator {
         double constant = 1.0;
         double F1 = IbdEndsUtils.F((focusMorgans - ibdStartMorgans), ne);
         int start = cdfStart;
-        int nextDiscord = IbdEndsUtils.fwdDiscord(data.gt, h1, h2, start);
+        int nextDiscord = data.nextDiscord(h1, h2, start);
         int minNextDiscordPos = data.pos(nextDiscord) + gc_bp;
         while (true) {
-            cdfEnd = Math.min(nextDiscord+1, data.gt.nMarkers());
+            cdfEnd = nextDiscord+1;
             for (int m=start; m<cdfEnd; ++m) {
-                double F2 = IbdEndsUtils.F((data.morgans.get(m) - ibdStartMorgans), ne);
-                cdf[m] = cdf[m-1] + (F2-F1)*data.ibsProbs.fwdProb(m, nextDiscord)*constant;
+                double F2 = IbdEndsUtils.F((data.morgans(m) - ibdStartMorgans), ne);
+                cdf[m] = cdf[m-1] + (F2-F1)*data.fwdProb(m, nextDiscord)*constant;
                 F1 = F2;
             }
             if (finished(start)) {
@@ -187,14 +193,14 @@ public class QuantileEstimator {
                 constant *= factor;
             }
             start = cdfEnd;
-            nextDiscord = IbdEndsUtils.fwdDiscord(data.gt, h1, h2, start);
+            nextDiscord = data.nextDiscord(h1, h2, start);
             int discordPos = data.pos(nextDiscord);
             double num = gc_err;
             if (discordPos >= minNextDiscordPos) {
                 num = err;
                 minNextDiscordPos = discordPos + gc_bp;
             }
-            constant *= (num/data.ibsProbs.fwdProb(start, nextDiscord));
+            constant *= (num/data.fwdProb(start, nextDiscord));
         }
     }
 
@@ -220,12 +226,15 @@ public class QuantileEstimator {
         if (index<0) {
             index = -index - 1;
         }
+        if (index==nMarkers) {
+            return data.pos(nMarkers);
+        }
         double p1 = cdf[index-1];   // assert cdf[cdfStart-1]==0.0;
         double p2 = cdf[index];
         assert p1<=p && p<=p2;
 
-        double x1 = (index==cdfStart) ? focusMorgans : data.morgans.get(index-1);
-        double x2 = data.morgans.get(index);
+        double x1 = (index==cdfStart) ? focusMorgans : data.morgans(index-1);
+        double x2 = data.morgans(index);
 
         double F1 = IbdEndsUtils.F((x1 - ibdStartMorgans), ne);
         double F2 = IbdEndsUtils.F((x2 - ibdStartMorgans), ne);
@@ -235,8 +244,8 @@ public class QuantileEstimator {
         double delta = (x-x1)/(x2-x1);
 
         // minimum quantile needs to be focusPos+1 to avoid division by 0
-        int y1 = index==cdfStart ? focusPos+1 : data.pos.get(index-1);
-        int y2 = data.pos.get(index);
+        int y1 = index==cdfStart ? focusPos+1 : data.pos(index-1);
+        int y2 = data.pos(index);
         int y = (int) Math.rint(y1 + delta*(y2-y1));
         assert y1<=y && y<=y2;
         return y;
@@ -245,27 +254,44 @@ public class QuantileEstimator {
     private static class Data {
 
         private final GT gt;
+        private final int nMarkers;
+        private final int lastPos;
         private final WrappedIntArray pos;
         private final DoubleArray morgans;
         private final IbsLengthProbs ibsProbs;
 
+        // morgan position of hypothetical discordant marker with index morgans.size()
+        private final double nMarkersMorgans;
+
         private Data(IbdEndsData data, boolean fwd) {
             if (fwd) {
                 this.gt = data.fwdGT();
+                this.nMarkers = gt.nMarkers();
                 this.pos = data.fwdPos();
+                this.lastPos = pos.get(pos.size()-1);
                 this.morgans = data.fwdMorgans();
+                this.nMarkersMorgans = morgans.get(morgans.size()-1)
+                        + data.par().end_morgans();
                 this.ibsProbs = data.fwdIbsProbs();
             }
             else {
                 this.gt = data.revGT();
+                this.nMarkers = gt.nMarkers();
                 this.pos = data.revPos();
+                this.lastPos = pos.get(pos.size()-1);
                 this.morgans = data.revMorgans();
+                this.nMarkersMorgans = morgans.get(morgans.size()-1)
+                        + data.par().end_morgans();
                 this.ibsProbs = data.revIbsProbs();
             }
         }
 
+        private double morgans(int marker) {
+            return marker==nMarkers ? nMarkersMorgans : morgans.get(marker);
+        }
+
         private int pos(int marker) {
-            return marker==gt.nMarkers() ? Integer.MAX_VALUE : pos.get(marker);
+            return marker==nMarkers ? lastPos: pos.get(marker);
         }
 
         private double posToMorgans(int position) {
@@ -275,6 +301,14 @@ public class QuantileEstimator {
         private int nextMarker(int position) {
             int insPt = pos.binarySearch(position);
             return insPt<0 ? -insPt-1 : insPt+1;
+        }
+
+        private int nextDiscord(int hap1, int hap2, int start) {
+            return IbdEndsUtils.fwdDiscord(gt, hap1, hap2, start);
+        }
+
+        private double fwdProb(int marker, int nextDiscord) {
+            return ibsProbs.fwdProb(marker, nextDiscord);
         }
     }
 }

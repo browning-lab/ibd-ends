@@ -162,9 +162,11 @@ public interface RefGTRec extends GTRec {
     int majorAllele();
 
     /**
-     * Returns the number of haplotypes that carry the specified allele.
+     * Returns the number of haplotypes that carry the specified
+     * non-major allele.
      * @param allele an allele index
-     * @return the number of haplotypes that carry the specified allele
+     * @return the number of haplotypes that carry the specified non-major
+     * allele
      * @throws IllegalArgumentException if
      * {@code allele == this.majorAllele()}
      * @throws IndexOutOfBoundsException if

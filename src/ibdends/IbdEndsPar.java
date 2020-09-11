@@ -76,6 +76,7 @@ public final class IbdEndsPar {
     private final float global_factor;   // factor to multiply by median global-quantile value
     private final float max_local_cdf;   // max CDF probability for using local IBS length distribution
     private final int max_its;           // max number of iterative updates to end points
+    private final float end_morgans;     // morgans from first/last marker to hypothetical next discordance
 
     private static final float DEF_NE = 10000f;
     private static final int DEF_LOCAL_HAPS = 10000;
@@ -85,6 +86,7 @@ public final class IbdEndsPar {
     private static final float DEF_GLOBAL_FACTOR = 3.0f;
     private static final float DEF_MAX_LOCAL_CDF = 0.999f;
     private static final int DEF_MAX_ITS = 10;
+    private static final float DEF_END_MORGANS = 1.0f;
 
     private final boolean fix_focus;     // if true, do not iteratively update focus
     private final float length_quantile; // quantile used to estimate pre-focus IBD length
@@ -158,6 +160,8 @@ public final class IbdEndsPar {
         max_local_cdf = Validate.floatArg("max-local-cdf", argsMap, false,
                 DEF_MAX_LOCAL_CDF, MIN_PROP, MAX_PROP);
         max_its = Validate.intArg("max-its", argsMap, false, DEF_MAX_ITS, 1, IMAX);
+        end_morgans = Validate.floatArg("end-morgans", argsMap, false,
+                DEF_END_MORGANS, 0.0f, Float.MAX_VALUE);
 
         fix_focus = Validate.booleanArg("fix-focus", argsMap, false, DEF_FIX_FOCUS);
         length_quantile = Validate.floatArg("length-quantile", argsMap, false,
@@ -223,23 +227,23 @@ public final class IbdEndsPar {
         return "Usage: " + IbdEndsMain.COMMAND + " [arguments]" + nl
                 + nl
                 + "Data Parameters: " + nl
-                + "  gt=<VCF file with GT field>                          (required)" + nl
-                + "  chrom=<chromosome region to be analyzed>             (default: first chrom in VCF file)" + nl
-                + "  ibd=<hap-ibd output file obtained from gt>           (required)" + nl
-                + "  map=<PLINK map file with cM units>                   (required)" + nl
-                + "  out=<output file prefix>                             (required)" + nl
-                + "  excludesamples=<excluded samples file>               (optional)" + nl + nl
+                + "  gt=<VCF file with GT field>                           (required)" + nl
+                + "  ibd=<hap-ibd output file from specified VCF file>     (required)" + nl
+                + "  map=<PLINK map file with cM units>                    (required)" + nl
+                + "  chrom=<chromosome to be analyzed>                     (default: 1st VCF chrom)" + nl
+                + "  out=<output file prefix>                              (required)" + nl
+                + "  excludesamples=<excluded samples file>                (optional)" + nl + nl
 
                 + "Algorithm Parameters: " + nl
-                + "  quantiles=<comma-separated list of quantiles>        (default: " + DEF_QUANTILES + ")" + nl
-                + "  nsamples=<number of sampled end points>              (default: " + DEF_NSAMPLES + ")" + nl
-                + "  nthreads=<number of computational threads>           (default: all CPU cores)" + nl
-                + "  err=<IBD allele mismatch probability>                (default: " + DEF_ERR + ")" + nl
-                + "  estimate-err=<true/false>                            (default: " + DEF_ESTIMATE_ERR + ")" + nl
-                + "  gc-err=<gene conversion allele mismatch probability> (default: " + DEF_GC_ERR + ")" + nl
-                + "  gc-bp=<max gene conversion base pair length>         (default: " + DEF_GC_BP + ")" + nl
-                + "  min-maf=<minimum permitted minor allele frequency>   (default: " + DEF_MIN_MAF + ")" + nl
-                + "  seed=<random seed>                                   (default=" + DEF_SEED + ")" + nl + nl;
+                + "  quantiles=<comma-separated list of quantiles>         (default: " + DEF_QUANTILES + ")" + nl
+                + "  nsamples=<number of sampled endpoints>                (default: " + DEF_NSAMPLES + ")" + nl
+                + "  nthreads=<number of computational threads>            (default: all CPU cores)" + nl
+                + "  err=<IBD allele mismatch probability>                 (default: " + DEF_ERR + ")" + nl
+                + "  estimate-err=<true/false>                             (default: " + DEF_ESTIMATE_ERR + ")" + nl
+                + "  gc-err=<gene conversion allele mismatch probability>  (default: " + DEF_GC_ERR + ")" + nl
+                + "  gc-bp=<max gene conversion base pair length>          (default: " + DEF_GC_BP + ")" + nl
+                + "  min-maf=<min permitted minor allele frequency>        (default: " + DEF_MIN_MAF + ")" + nl
+                + "  seed=<random seed>                                    (default=" + DEF_SEED + ")" + nl + nl;
     }
 
     // data input/output parameters
@@ -322,8 +326,8 @@ public final class IbdEndsPar {
      */
     public int nthreads() {
         return nthreads;
-    }    
-    
+    }
+
     /**
      * Returns the err parameter.
      * @return the err parameter
@@ -437,6 +441,14 @@ public final class IbdEndsPar {
      */
     public int max_its() {
         return max_its;
+    }
+
+    /**
+     * Returns the end-morgans parameter.
+     * @return the end-morgans parameter
+     */
+    public float end_morgans() {
+        return end_morgans;
     }
 
     /**

@@ -18,8 +18,8 @@
 package vcf;
 
 import beagleutil.ChromIds;
+import blbutil.BitList;
 import blbutil.Const;
-import ints.LongArray;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -33,9 +33,7 @@ import java.util.Set;
  */
 public final class Markers {
 
-    private static final int LOG2_BITS_PER_WORD = 6;
-
-    private final Marker[] markerArray;
+    private final Marker[] markers;
     private final Set<Marker> markerSet;
     private final int[] sumAlleles;
     private final int[] sumGenotypes;
@@ -80,13 +78,13 @@ public final class Markers {
      */
     private Markers(Marker[] markers) {
         checkMarkerPosOrder(markers);
-        this.markerArray = markers.clone();
-        this.markerSet = markerSet(markerArray);
+        this.markers = markers.clone();
+        this.markerSet = markerSet(markers);
 
-        this.sumAlleles = cumSumAlleles(markerArray);
-        this.sumGenotypes = cumSumGenotypes(markerArray);
-        this.sumHapBits = cumSumHaplotypeBits(markerArray);
-        this.hashCode = Arrays.deepHashCode(markerArray);
+        this.sumAlleles = cumSumAlleles(markers);
+        this.sumGenotypes = cumSumGenotypes(markers);
+        this.sumHapBits = cumSumHaplotypeBits(markers);
+        this.hashCode = Arrays.deepHashCode(markers);
     }
 
     private static void checkMarkerPosOrder(Marker[] markers) {
@@ -195,7 +193,7 @@ public final class Markers {
             return false;
         }
         final Markers other = (Markers) obj;
-        return Arrays.deepEquals(this.markerArray, other.markerArray);
+        return Arrays.deepEquals(this.markers, other.markers);
     }
 
     /**
@@ -203,7 +201,7 @@ public final class Markers {
      * @return the number of markers
      */
     public int nMarkers() {
-        return markerArray.length;
+        return markers.length;
     }
 
     /**
@@ -214,7 +212,7 @@ public final class Markers {
      * {@code marker < 0 || marker >= this.nMarkers()}
      */
     public Marker marker(int marker) {
-        return markerArray[marker];
+        return markers[marker];
     }
 
     /**
@@ -222,7 +220,7 @@ public final class Markers {
      * @return the list of markers
      */
     public Marker[] markers() {
-        return markerArray.clone();
+        return markers.clone();
     }
 
     /**
@@ -249,13 +247,13 @@ public final class Markers {
      *
      * @throws IndexOutOfBoundsException if
      * {@code start < 0 || end > this.nMarkers()}
-     * @throws IllegalArgumentException if {@code start >= end}.
+     * @throws IllegalArgumentException if {@code start >= end}
      */
     public Markers restrict(int start, int end) {
-        if (end > markerArray.length) {
+        if (end > markers.length) {
             throw new IndexOutOfBoundsException("end > this.nMarkers(): " + end);
         }
-        return new Markers(Arrays.copyOfRange(markerArray, start, end));
+        return new Markers(Arrays.copyOfRange(markers, start, end));
     }
 
     /**
@@ -275,12 +273,12 @@ public final class Markers {
      */
     public Markers restrict(int[] indices) {
         Marker[] ma = new Marker[indices.length];
-        ma[0] = markerArray[indices[0]];
+        ma[0] = markers[indices[0]];
         for (int j=1; j<indices.length; ++j) {
             if (indices[j] <= indices[j-1]) {
                 throw new IllegalArgumentException(String.valueOf(indices[j]));
             }
-            ma[j] = markerArray[indices[j]];
+            ma[j] = markers[indices[j]];
         }
         return new Markers(ma);
     }
@@ -303,7 +301,7 @@ public final class Markers {
      * @return {@code this.sumAlleles(this.nMarkers())}
      */
     public int sumAlleles() {
-        return sumAlleles[markerArray.length];
+        return sumAlleles[markers.length];
     }
 
     /**
@@ -324,7 +322,7 @@ public final class Markers {
      * @return {@code this.sumGenotypes(this.nMarkers())}
      */
     public int sumGenotypes() {
-        return sumGenotypes[markerArray.length];
+        return sumGenotypes[markers.length];
     }
 
     /**
@@ -336,7 +334,7 @@ public final class Markers {
      * @throws IndexOutOfBoundsException if
      * {@code marker < 0 || marker > this.nMarkers()}
      */
-    public int sumHaplotypeBits(int marker) {
+    public int sumHapBits(int marker) {
         return sumHapBits[marker];
     }
 
@@ -344,121 +342,146 @@ public final class Markers {
      * Returns {@code this.sumHaplotypeBits(this.nMarkers())}.
      * @return {@code this.sumHaplotypeBits(this.nMarkers())}
      */
-    public int sumHaplotypeBits() {
-        return sumHapBits[markerArray.length];
-    }
-
-    /**
-     * Returns a bit array storing the specified haplotype.
-     * @param alleles the alleles at each marker
-     * @return a bit array storing the specified haplotype.
-     * @throws IllegalArgumentException if
-     * {@code alleles.length != this.nMarkers()}
-     * @throws NullPointerException if {@code alleles == null}
-     */
-    public LongArray allelesToBits(int[] alleles) {
-        if (alleles.length != markerArray.length) {
-            throw new IllegalArgumentException(String.valueOf(alleles.length));
-        }
-        int nWords = (sumHapBits[markerArray.length] + (Long.SIZE-1)) >> LOG2_BITS_PER_WORD;
-        long[] bits = new long[nWords];
-        int bitIndex = 0;
-        for (int k=0; k<alleles.length; ++k) {
-            int allele = alleles[k];
-            if (allele < 0 || allele >= markerArray[k].nAlleles()) {
-                String s = "allele \"" + allele + "\" out of bounds for marker: "
-                        + markerArray[k];
-                throw new IllegalArgumentException(s);
-            }
-            int mask = 1;
-            int nBits = sumHapBits[k+1] - sumHapBits[k];
-            for (int l=0; l<nBits; ++l) {
-                if ((allele & mask)==mask) {
-                    int wordIndex =  bitIndex >> LOG2_BITS_PER_WORD;
-                    bits[wordIndex] |= (1L << bitIndex);
-                }
-                bitIndex++;
-                mask <<= 1;
-            }
-        }
-        return new LongArray(bits);
+    public int sumHapBits() {
+        return sumHapBits[markers.length];
     }
 
     /**
      * Returns the specified allele stored in the specified {@code hapBits}
      * array.  The contract for this method is undefined if the specified
-     * {@code hapBits} array was not created with the {@code this.allelesToBits()}
-     * method.
-     * @param hapBits the bit array storing the haplotype alleles
-     * @param marker a marker index
-     * @return the specified allele stored in the specified {@code hapBits}
-     * array.
-     * @throws IndexOutOfBoundsException if
-     * {@code marker < 0 || marker >= this.nMarkers()}
-     */
-    public int bitsToAllele(LongArray hapBits, int marker) {
-        int start = sumHapBits[marker];
-        int end = sumHapBits[marker+1];
-        if (end==(start+1)) {
-            int wordIndex =  start >> LOG2_BITS_PER_WORD;
-            return (int) (hapBits.get(wordIndex) >> start) & 1;
-        }
-        int allele = 0;
-        int mask = 1;
-        for (int j=start; j<end; ++j) {
-            int wordIndex =  j >> LOG2_BITS_PER_WORD;
-            if ((hapBits.get(wordIndex) & (1L << j)) != 0) {
-                allele |= mask;
-            }
-            mask <<= 1;
-        }
-        return allele;
-    }
-
-//    public int altBitsToAllele(LongArray hapBits, int marker) {
-//        // if employing this method, need to add extra 0 word to end of hapBits LongArrays
-//        int start = sumHapBits[marker];
-//        int end = sumHapBits[marker+1];
-//        int index =  start >> LOG2_BITS_PER_WORD;
-//        int offset = start & 0b111111;
-//        int mask1 = (1 << (end-start)) - 1;
-//        int mask2 = (1 << offset) - 1;
-//        // NB: if offset==0, then (Long.SIZE-offset) in left-shift is 0
-//        return (int) ((hapBits.get(index) >>> offset)
-//            | ((hapBits.get(index+1) & mask2) << (Long.SIZE-offset))) & mask1;
-//    }
-
-    /**
-     * Returns the specified allele stored in the specified {@code hapBits}
-     * array.  The contract for this method is undefined if the specified
-     * {@code hapBits} array was not created with the 
+     * {@code hapBits} array was not created with the
      * {@code this.allelesToBits()} method.
      * @param hapBits the bit array storing the haplotype alleles
      * @return the specified allele stored in the specified {@code hapBits}
      * array.
      * @throws NullPointerException if {@code hapBits == null}
      */
-    public int[] bitsToAlleles(LongArray hapBits) {
-        int[] alleles = new int[markerArray.length];
+    public int[] bitsToAlleles(BitList hapBits) {
+        int[] alleles = new int[markers.length];
         for (int m=0; m<alleles.length; ++m) {
             int start = sumHapBits[m];
             int end = sumHapBits[m+1];
             if (end==(start+1)) {
-                int wordIndex =  start >> LOG2_BITS_PER_WORD;
-                alleles[m] = (int) (hapBits.get(wordIndex) >> start) & 1;
+                alleles[m] = hapBits.get(start) ? 1 : 0;
             }
-            int allele = 0;
+            else {
+                int allele = 0;
+                int mask = 1;
+                for (int j=start; j<end; ++j) {
+                    if (hapBits.get(j)) {
+                        allele |= mask;
+                    }
+                    mask <<= 1;
+                }
+                alleles[m] = allele;
+            }
+        }
+        return alleles;
+    }
+
+    /**
+     * Stores the specified alleles in the specified {@code bitList}
+     * @param alleles a sequence of alleles
+     * @param bitList a sequence of bits
+     * @throws IllegalArgumentException if
+     * {@code alleles.length != this.nMarkers()}
+     * @throws IllegalArgumentException if
+     * {@code bitList.size() != this.sumHaplotypeBits()}
+     * @throws IllegalArgumentException if there exists a {@code k}
+     * such that {@code (0 < k && k < alleles.length)} and
+     * {@code (alleles[k] < 0 || alleles[k] >= this.makrer(k).nAlleles()})
+     * @throws NullPointerException if
+     * {@code alleles == null || bitList == null}
+     */
+    public void allelesToBits(int[] alleles, BitList bitList) {
+        if (alleles.length != markers.length) {
+            throw new IllegalArgumentException(String.valueOf(alleles.length));
+        }
+        if (bitList.size() != this.sumHapBits()) {
+            throw new IllegalArgumentException(String.valueOf(bitList.size()));
+        }
+        for (int k=0; k<alleles.length; ++k) {
+            int allele = alleles[k];
+            if (allele < 0 || allele >= markers[k].nAlleles()) {
+                String s = "allele \"" + allele + "\" out of bounds for marker: "
+                        + markers[k];
+                throw new IllegalArgumentException(s);
+            }
             int mask = 1;
-            for (int j=start; j<end; ++j) {
-                int wordIndex =  j >> LOG2_BITS_PER_WORD;
-                if ((hapBits.get(wordIndex) & (1L << j)) != 0) {
-                    allele |= mask;
+            for (int j=sumHapBits[k]; j<sumHapBits[k+1]; ++j) {
+                if ((allele & mask)==mask) {
+                    bitList.set(j);
+                }
+                else {
+                    bitList.clear(j);
                 }
                 mask <<= 1;
             }
-            alleles[m] = allele;
         }
-        return alleles;
+    }
+
+    /**
+     * Stores the specified alleles in the specified {@code bitList}
+     * @param marker a marker index
+     * @param allele an allele index
+     * @param bitList a sequence of bits
+     * @throws IllegalArgumentException if
+     * {@code alleles.length != this.nMarkers()}
+     * @throws IllegalArgumentException if
+     * {@code bitList.size() != this.sumHaplotypeBits()}
+     * @throws IllegalArgumentException if there exists a {@code k}
+     * such that {@code (0 < k && k < alleles.length)} and
+     * {@code (alleles[k] < 0 || alleles[k] >= this.makrer(k).nAlleles()})
+     * @throws NullPointerException if {@code bitList == null}
+     */
+    public void setAllele(int marker, int allele, BitList bitList) {
+        if (bitList.size() != this.sumHapBits()) {
+            throw new IllegalArgumentException(String.valueOf(bitList.size()));
+        }
+        if (allele < 0 || allele >= markers[marker].nAlleles()) {
+            String s = "allele \"" + allele + "\" out of bounds for marker: "
+                    + markers[marker];
+            throw new IllegalArgumentException(s);
+        }
+        int mask = 1;
+        for (int j=sumHapBits[marker], n=sumHapBits[marker+1]; j<n; ++j) {
+            if ((allele & mask)==mask) {
+                bitList.set(j);
+            }
+            else {
+                bitList.clear(j);
+            }
+            mask <<= 1;
+        }
+    }
+
+    /**
+     * Returns the specified allele
+     * @param hapBits a haplotype encoded as bits with the
+     * {@code this.allelesToBits() method}
+     * @param marker a marker index
+     * @return the specified allele
+     * @throws IndexOutOfBoundsException if
+     * {@code marker < 0 || marker >= this.nMarkers()}
+     * @throws IndexOutOfBoundsException if
+     * {@code hapBits.size() < this.sumHaplotypeBits(marker + 1)}
+     * @throws NullPointerException if {@code hapBits == null}
+     */
+    public int allele(BitList hapBits, int marker) {
+        int start = sumHapBits[marker];
+        int end = sumHapBits[marker+1];
+        if (end==(start+1)) {
+            return hapBits.get(start) ? 1 : 0;
+        }
+        int allele = 0;
+        int mask = 1;
+        for (int j=start; j<end; ++j) {
+            if (hapBits.get(j)) {
+                allele |= mask;
+            }
+            mask <<= 1;
+        }
+        return allele;
     }
 
     /**
@@ -469,7 +492,6 @@ public final class Markers {
      */
     @Override
     public String toString() {
-        return Arrays.toString(markerArray);
+        return Arrays.toString(markers);
     }
 }
-

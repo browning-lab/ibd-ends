@@ -23,10 +23,7 @@ import ints.IntArray;
 import ints.IntList;
 import ints.UnsignedByteArray;
 import ints.WrappedIntArray;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
 import java.util.Random;
 import java.util.stream.IntStream;
 import vcf.GT;
@@ -68,13 +65,15 @@ public class IbsCounts {
         }
         IntArray[] alleles = alleles(gt, hapList);
         Boolean[] isMonomorphic = isMonomorphic(alleles);
+        int maxAlleleCnt = maxAlleles(gt);
 
         double maxLocalCDF = par.max_local_cdf();
         long minIbsPairs = (long) Math.ceil(((1.0-maxLocalCDF)*n)*(n-1));
         this.nHaps = hapList.length;
         this.counts = IntStream.range(0, gt.nMarkers())
                 .parallel()
-                .mapToObj(m -> counts(gt, alleles, isMonomorphic, m, minIbsPairs))
+                .mapToObj(m -> counts(gt, alleles, maxAlleleCnt, isMonomorphic,
+                        m, minIbsPairs))
                 .toArray(int[][]::new);
     }
 
@@ -152,69 +151,57 @@ public class IbsCounts {
         return true;
     }
 
-    private static int[] counts(GT gt, IntArray[] alleles, Boolean[] isMonomorphic,
-            int start, long minIbsPairs) {
+    private static int maxAlleles(GT gt) {
+        return IntStream.range(0, gt.nMarkers())
+                .parallel()
+                .map(m -> gt.marker(m).nAlleles())
+                .max()
+                .orElse(0);
+    }
+
+    private static int[] counts(GT gt, IntArray[] alleles, int maxAlleleCnt,
+            Boolean[] isMonomorphic, int start, long minIbsPairs) {
         int nMarkers = alleles.length;
-        int n = alleles[start].size();
+        int nHaps = alleles[start].size();
         IntList cnts = new IntList(1<<8);
-        List<int[]> hapLists = new ArrayList<>(1);
-        hapLists.add(IntStream.range(0, n).toArray());
-        int lastIbsPairs = sumIbsPairs(hapLists);
-        for (int m=start; m<nMarkers && lastIbsPairs>=minIbsPairs; ++m) {
-            if (Objects.equals(isMonomorphic[m], Boolean.FALSE)) {
-                hapLists = partitionLists(gt, alleles[m], m, hapLists);
-                int ibsPairs = sumIbsPairs(hapLists);
+        int[] hap2Seq = new int[nHaps];
+        int[] seq2Cnt = new int[nHaps];
+        int[] seqAlMap = new int[maxAlleleCnt*nHaps];
+        seq2Cnt[0] = nHaps;
+        int nSeq = 1;
+        int ibsPairs = sumIbsPairs(seq2Cnt, nSeq);
+        for (int m=start; m<nMarkers && ibsPairs>=minIbsPairs; ++m) {
+            if (isMonomorphic[m]) {
+                cnts.add(ibsPairs);
+            }
+            else {
+                int nAlleles = gt.marker(m).nAlleles();
+                Arrays.fill(seqAlMap, 0, nAlleles*nSeq, -1);
+                Arrays.fill(seq2Cnt, 0, nSeq, 0);
+                nSeq = 0;
+                for (int j=0; j<nHaps; ++j) {
+                    int seqAlIndex = hap2Seq[j]*nAlleles + alleles[m].get(j);
+                    int newSeq = seqAlMap[seqAlIndex];
+                    if (newSeq<0) {
+                        newSeq = nSeq++;
+                        seqAlMap[seqAlIndex] = newSeq;
+                    }
+                    hap2Seq[j] = newSeq;
+                    ++seq2Cnt[newSeq];
+                }
+                ibsPairs = sumIbsPairs(seq2Cnt, nSeq);
                 if (ibsPairs>=minIbsPairs) {
                     cnts.add(ibsPairs);
                 }
-                lastIbsPairs = ibsPairs;
-            }
-            else {
-                cnts.add(lastIbsPairs);
             }
         }
         return cnts.toArray();
     }
 
-    /**
-     * Returns the probability that two distinct haplotypes in the same list
-     * have different alleles at the specified marker.  The contract for this
-     * method is undefined if any haplotype is present more than once in the
-     * specified lists of haplotypes.
-     * @param gt the genotype data
-     * @param alleles the haplotype alleles
-     * @param m the marker
-     * @param hapLists lists of haplotypes
-     * @return the probability that two distinct haplotypes in the same list
-     * have different alleles at the specified marker
-     */
-    private static List<int[]> partitionLists(GT gt, IntArray alleles, int m,
-            List<int[]> hapLists) {
-        List<int[]> nextHapLists = new ArrayList<>(hapLists.size());
-        IntList[] scratchLists = IntStream.range(0, gt.marker(m).nAlleles())
-                .mapToObj(j -> new IntList())
-                .toArray(IntList[]::new);
-        for (int i=0, n=hapLists.size(); i<n; ++i) {
-            int[] hapList = hapLists.get(i);
-            for (int h : hapList) {
-                scratchLists[alleles.get(h)].add(h);
-            }
-            for (IntList scratchList : scratchLists) {
-                if (scratchList.size()>1) {
-                    nextHapLists.add(scratchList.toArray());
-                }
-                scratchList.clear();
-            }
-        }
-        hapLists.clear();
-        return nextHapLists;
-    }
-
-    private static int sumIbsPairs(List<int[]> ibsLists) {
+    private static int sumIbsPairs(int[] seqCnts, int nSeq) {
         int sum = 0;
-        for (int j=0, n=ibsLists.size(); j<n; ++j) {
-            long len = ibsLists.get(j).length;
-            sum += len*(len-1);
+        for (int j=0; j<nSeq; ++j) {
+            sum += seqCnts[j]*(seqCnts[j]-1);
         }
         return sum;
     }
