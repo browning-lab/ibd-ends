@@ -10,12 +10,12 @@ version printed in the first line of the output log file, and
 please cite the article that describes the **ibd-ends** method:
 
 > [Sharon R Browning](https://sites.uw.edu/sguy/),
-[Brian L Browning](http://faculty.washington.edu/browning/).
+[Brian L Browning](http://faculty.washington.edu/browning/). (2020)
 Probabilistic estimation of identity by descent segment endpoints and
-detection of recent selection. bioRxiv 2020.07.15.205179;
-doi: [https://doi.org/10.1101/2020.07.15.205179](https://doi.org/10.1101/2020.07.15.205179)
+detection of recent selection. American Journal of Human Genetics 107(5):895-910.
+[https://doi.org/10.1016/j.ajhg.2020.09.010](https://doi.org/10.1016/j.ajhg.2020.09.010)
 
-Last updated September 11, 2020
+Last updated February 25, 2021
 
 ## Contents
 
@@ -101,9 +101,7 @@ The **ibd-ends** program uses linear interpolation to estimate the genetic
 position of base coordinates between map positions.
 The chromosome identifier in the input VCF file and map file must be identical.
 HapMap genetic maps in cM units are available for
-[GRCh36](http://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/plink.GRCh36.map.zip),
-[GRCh37](http://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/plink.GRCh37.map.zip), and
-[GRCh38](http://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/plink.GRCh38.map.zip).
+[GRCh36, GRCh37, and GRCh38](http://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/).
 
 * **out=[string]** where **[string]** is the output filename prefix.
 
