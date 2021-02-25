@@ -47,7 +47,7 @@ import java.util.concurrent.Executors;
 public class IbdEndsMain {
 
     private static final String EXECUTABLE = "ibd-ends.jar";
-    private static final String PROGRAM = EXECUTABLE + "  [version 1.1, __REV__]";
+    private static final String PROGRAM = EXECUTABLE + "  [version 1.1, 25Feb21.291]";
     private static final String COPYRIGHT = "Copyright (C) 2020 Brian L. Browning";
 
     /**
