@@ -15,7 +15,7 @@ Probabilistic estimation of identity by descent segment endpoints and
 detection of recent selection. American Journal of Human Genetics 107(5):895-910.
 [https://doi.org/10.1016/j.ajhg.2020.09.010](https://doi.org/10.1016/j.ajhg.2020.09.010)
 
-Last updated February 25, 2021
+Last updated May 20, 2022
 
 ## Contents
 
@@ -101,7 +101,7 @@ The **ibd-ends** program uses linear interpolation to estimate the genetic
 position of base coordinates between map positions.
 The chromosome identifier in the input VCF file and map file must be identical.
 HapMap genetic maps in cM units are available for
-[GRCh36, GRCh37, and GRCh38](http://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/).
+[GRCh36, GRCh37, and GRCh38](https://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/).
 
 * **out=[string]** where **[string]** is the output filename prefix.
 
